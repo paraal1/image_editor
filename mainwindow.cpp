@@ -9,7 +9,7 @@
 #include <opencv2/opencv.hpp>       // Full OpenCV library for image processing functions
 #include <QPixmap>
 #include <QColorDialog>
-
+#include <opencv2/imgproc.hpp> // Include OpenCV drawing functions
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -53,6 +53,8 @@ void MainWindow::on_add_image_clicked() {
 
 QColor textColor = Qt::black;
 
+#include <opencv2/imgproc.hpp> // Include OpenCV drawing functions
+
 void MainWindow::updateImage() {
     QString text = ui->textLabel->text();  // Get text from QLineEdit
     int xPos = ui->xPositionSlider->value(); // Get X position from xSlider
@@ -62,25 +64,36 @@ void MainWindow::updateImage() {
         return; // Do nothing if there’s no text or image loaded
     }
 
-    // Add font size and thickness
     int font_size = ui->fontSizeSlider->value();
     int font_thickness = ui->fontThicknessSlider->value();
-    QFont text_style = QFont("Arial", font_size, font_thickness);
 
-    // Add offset
-    int offsetX = std::max(10, xPos);
-    int offsetY = std::max(25, yPos);
+    // Convert QPixmap to cv::Mat
+    QImage qImage = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
+    cv::Mat matImage = cv::Mat(qImage.height(), qImage.width(), CV_8UC3, const_cast<uchar*>(qImage.bits()), qImage.bytesPerLine()).clone();
 
-    QPixmap pixmapWithText = originalPixmap;
-    QPainter painter(&pixmapWithText);
-    painter.setPen(textColor);
-    painter.setFont(text_style);
-    painter.drawText(offsetX, offsetY, text); // Draw the text on the image
-    painter.end();
+    // Set the color and thickness
+    cv::Scalar cvTextColor(textColor.red(), textColor.green(), textColor.blue());
 
-    ui->imageFrame->setPixmap(pixmapWithText); // Update the displayed image
-    currentPixmap = pixmapWithText; // Update currentPixmap
+    // Add the text using OpenCV's putText
+    cv::putText(
+        matImage,
+        text.toStdString(),
+        cv::Point(xPos, yPos),
+        cv::FONT_HERSHEY_SIMPLEX,
+        font_size / 10.0,  // Scale font size to be more manageable
+        cvTextColor,
+        font_thickness
+        );
+
+    // Convert the cv::Mat back to QPixmap
+    QImage updatedQImage(matImage.data, matImage.cols, matImage.rows, matImage.step, QImage::Format_RGB888);
+    QPixmap pixmapWithText = QPixmap::fromImage(updatedQImage);
+
+    // Update the displayed image
+    ui->imageFrame->setPixmap(pixmapWithText);
+    currentPixmap = pixmapWithText;
 }
+
 
 void MainWindow::on_pushButton_clicked()
 {
